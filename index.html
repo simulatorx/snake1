@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake 1 - Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #9EB1AF;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .game-container {
+            position: relative;
+            width: 320px;
+            margin: 0 auto;
+            background-color: #CBDEDF;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .cab-header {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        #game-canvas {
+            background-color: #CAD69A;
+            border: 4px solid #525F1A;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .score-board {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 18px;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .controls button {
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 15px;
+            margin: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+        
+        .game-over button {
+            background-color: #2E8B57;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-top: 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .d-pad {
+            margin-top: 20px;
+            position: relative;
+            width: 150px;
+            height: 150px;
+            margin: 20px auto;
+        }
+        
+        .d-btn {
+            position: absolute;
+            background-color: #555;
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 5px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        
+        .up {
+            top: 0;
+            left: 50px;
+        }
+        
+        .right {
+            right: 0;
+            top: 50px;
+        }
+        
+        .down {
+            bottom: 0;
+            left: 50px;
+        }
+        
+        .left {
+            left: 0;
+            top: 50px;
+        }
+        
+        .middle {
+            left: 50px;
+            top: 50px;
+            background-color: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="cab-header">Snake 1 - Game</div>
+        <canvas id="game-canvas" width="240" height="240"></canvas>
+        <div class="score-board">
+            <div>Score: <span id="score">0</span></div>
+            <div>Level: <span id="level">1</span></div>
+        </div>
+        
+        <div class="d-pad">
+            <button class="d-btn up" id="up-btn">▲</button>
+            <button class="d-btn right" id="right-btn">▶</button>
+            <button class="d-btn down" id="down-btn">▼</button>
+            <button class="d-btn left" id="left-btn">◀</button>
+            <button class="d-btn middle" id="pause-btn">II</button>
+        </div>
+		
+		<label>If you liked it, consider sponsoring me on PayPal: </label>
+		<form action="https://www.paypal.com/donate" method="post" target="_top">
+		<input type="hidden" name="hosted_button_id" value="653CQGJJHXJ9W" />
+		<input type="image" src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+		<img alt="" border="0" src="https://www.paypal.com/en_US/i/scr/pixel.gif" width="1" height="1" />
+		</form>
+		
+		<div class="game-over" id="game-over">
+            <h2>GAME OVER</h2>
+            <p>Your Score: <span id="final-score">0</span></p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+        
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('game-canvas');
+            const ctx = canvas.getContext('2d');
+            const scoreElement = document.getElementById('score');
+            const levelElement = document.getElementById('level');
+            const gameOverScreen = document.getElementById('game-over');
+            const finalScoreElement = document.getElementById('final-score');
+            const restartBtn = document.getElementById('restart-btn');
+            
+            // Dimensões do grid
+            const blockSize = 12;
+            const gridWidth = canvas.width / blockSize;
+            const gridHeight = canvas.height / blockSize;
+            
+            // Estados do jogo
+            let snake = [];
+            let food = {};
+            let bonus = {}; // Comida bônus que aparece ocasionalmente
+            let obstacles = [];
+            let direction = 'right';
+            let nextDirection = 'right';
+            let score = 0;
+            let level = 1;
+            let speed = 130;
+            let gameLoop;
+            let isPaused = false;
+            let gameOver = false;
+            let bonusActive = false;
+            let bonusTimer = 0;
+            let bonusInterval;
+            
+            // Tipos de comida
+            const foodTypes = {
+                normal: { color: '#FF0000', points: 10 },
+                apple: { color: '#FF0000', points: 10 },
+                banana: { color: '#FFD700', points: 15 },
+                cherry: { color: '#8B0000', points: 20 }
+            };
+            
+            // Comida atual
+            let currentFoodType = 'apple';
+            
+            // Iniciar jogo
+            initGame();
+            
+            function initGame() {
+                // Inicializar cobra
+                snake = [
+                    {x: 10, y: 10},
+                    {x: 9, y: 10},
+                    {x: 8, y: 10}
+                ];
+                
+                // Limpar obstáculos
+                obstacles = [];
+                
+                // Criar obstáculos aleatórios
+                createObstacles();
+                
+                // Inicializar comida
+                createFood();
+                
+                // Configurar level e velocidade
+                score = 0;
+                level = 1;
+                speed = 130;
+                updateScore();
+                
+                // Direção inicial
+                direction = 'right';
+                nextDirection = 'right';
+                
+                // Estado do jogo
+                gameOver = false;
+                isPaused = false;
+                
+                // Esconder tela de game over
+                gameOverScreen.style.display = 'none';
+                
+                // Iniciar loop do jogo
+                if (gameLoop) clearInterval(gameLoop);
+                gameLoop = setInterval(gameStep, speed);
+                
+                // Configurar timer para comida bônus
+                setupBonusFood();
+            }
+            
+            function createObstacles() {
+                // Adicionar bordas do mapa como obstáculos
+                for (let i = 0; i < gridWidth; i++) {
+                    obstacles.push({x: i, y: 0}); // Topo
+                    obstacles.push({x: i, y: gridHeight - 1}); // Base
+                }
+                
+                for (let i = 0; i < gridHeight; i++) {
+                    obstacles.push({x: 0, y: i}); // Esquerda
+                    obstacles.push({x: gridWidth - 1, y: i}); // Direita
+                }
+                
+                // Adicionar alguns obstáculos aleatórios internos
+                if (level >= 2) {
+                    // Obstáculo horizontal
+                    const obstX = Math.floor(gridWidth / 4);
+                    const obstY = Math.floor(gridHeight / 2);
+                    const obstLength = Math.floor(gridWidth / 2);
+                    
+                    for (let i = 0; i < obstLength; i++) {
+                        obstacles.push({x: obstX + i, y: obstY});
+                    }
+                }
+                
+                if (level >= 3) {
+                    // Obstáculo vertical
+                    const obstX = Math.floor(gridWidth / 2);
+                    const obstY = Math.floor(gridHeight / 4);
+                    const obstLength = Math.floor(gridHeight / 2);
+                    
+                    for (let i = 0; i < obstLength; i++) {
+                        obstacles.push({x: obstX, y: obstY + i});
+                    }
+                }
+            }
+            
+            function createFood() {
+                // Escolher tipo de comida aleatório
+                const foodTypeKeys = Object.keys(foodTypes);
+                currentFoodType = foodTypeKeys[Math.floor(Math.random() * foodTypeKeys.length)];
+                
+                // Criar nova comida em posição aleatória
+                let newFood;
+                do {
+                    newFood = {
+                        x: Math.floor(Math.random() * (gridWidth - 2)) + 1,
+                        y: Math.floor(Math.random() * (gridHeight - 2)) + 1,
+                        type: currentFoodType
+                    };
+                } while (isCollision(newFood, [...snake, ...obstacles]));
+                
+                food = newFood;
+            }
+            
+            function setupBonusFood() {
+                // Configurar aparecimento aleatório de comida bônus
+                clearInterval(bonusInterval);
+                bonusActive = false;
+                
+                bonusInterval = setInterval(() => {
+                    if (!bonusActive && Math.random() < 0.5) {
+                        createBonusFood();
+                    }
+                }, 10000); // Verificar a cada 10 segundos
+            }
+            
+            function createBonusFood() {
+                let newBonus;
+                do {
+                    newBonus = {
+                        x: Math.floor(Math.random() * (gridWidth - 2)) + 1,
+                        y: Math.floor(Math.random() * (gridHeight - 2)) + 1
+                    };
+                } while (isCollision(newBonus, [...snake, ...obstacles]) || 
+                         (newBonus.x === food.x && newBonus.y === food.y));
+                
+                bonus = newBonus;
+                bonusActive = true;
+                bonusTimer = 50; // Duração da comida bônus
+            }
+            
+            function isCollision(pos, array) {
+                return array.some(segment => segment.x === pos.x && segment.y === pos.y);
+            }
+            
+            function gameStep() {
+                if (isPaused || gameOver) return;
+                
+                // Atualizar direção
+                direction = nextDirection;
+                
+                // Calcular nova posição da cabeça
+                const head = {x: snake[0].x, y: snake[0].y};
+                
+                switch (direction) {
+                    case 'up': head.y--; break;
+                    case 'down': head.y++; break;
+                    case 'left': head.x--; break;
+                    case 'right': head.x++; break;
+                }
+                
+                // Verificar colisão com obstáculos ou com a própria cobra
+                if (isCollision(head, obstacles) || isCollision(head, snake)) {
+                    endGame();
+                    return;
+                }
+                
+                // Adicionar nova cabeça
+                snake.unshift(head);
+                
+                // Verificar colisão com comida
+                let ate = false;
+                
+                if (head.x === food.x && head.y === food.y) {
+                    // Comeu comida normal
+                    score += foodTypes[food.type].points;
+                    updateScore();
+                    createFood();
+                    ate = true;
+                    
+                    // Verificar se deve subir de nível
+                    if (score >= level * 100) {
+                        levelUp();
+                    }
+                }
+                
+                if (bonusActive && head.x === bonus.x && head.y === bonus.y) {
+                    // Comeu comida bônus
+                    score += 50;
+                    updateScore();
+                    bonusActive = false;
+                    ate = true;
+                }
+                
+                // Remover último segmento se não comeu
+                if (!ate) {
+                    snake.pop();
+                }
+                
+                // Atualizar timer da comida bônus
+                if (bonusActive) {
+                    bonusTimer--;
+                    if (bonusTimer <= 0) {
+                        bonusActive = false;
+                    }
+                }
+                
+                // Desenhar tudo
+                draw();
+            }
+            
+            function levelUp() {
+                level++;
+                speed = Math.max(50, speed - 10); // Aumentar velocidade até um limite
+                
+                // Atualizar visor de nível
+                levelElement.textContent = level;
+                
+                // Reiniciar loop do jogo com nova velocidade
+                clearInterval(gameLoop);
+                gameLoop = setInterval(gameStep, speed);
+                
+                // Adicionar novos obstáculos
+                createObstacles();
+            }
+            
+            function draw() {
+                // Limpar canvas
+                ctx.fillStyle = '#CAD69A';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Desenhar obstáculos
+                ctx.fillStyle = '#525F1A';
+                obstacles.forEach(obstacle => {
+                    ctx.fillRect(obstacle.x * blockSize, obstacle.y * blockSize, blockSize, blockSize);
+                });
+                
+                // Desenhar cobra
+                snake.forEach((segment, index) => {
+                    // Cabeça
+                    if (index === 0) {
+                        ctx.fillStyle = '#000000';
+                    } else {
+                        // Corpo com padrão alternado
+                        ctx.fillStyle = index % 2 === 0 ? '#296D39' : '#2E8B57';
+                    }
+                    
+                    ctx.fillRect(segment.x * blockSize, segment.y * blockSize, blockSize, blockSize);
+                    
+                    // Desenhar olhos na cabeça
+                    if (index === 0) {
+                        ctx.fillStyle = 'white';
+                        
+                        // Posição dos olhos depende da direção
+                        if (direction === 'right') {
+                            ctx.fillRect((segment.x * blockSize) + blockSize - 4, (segment.y * blockSize) + 2, 2, 2);
+                            ctx.fillRect((segment.x * blockSize) + blockSize - 4, (segment.y * blockSize) + blockSize - 4, 2, 2);
+                        } else if (direction === 'left') {
+                            ctx.fillRect((segment.x * blockSize) + 2, (segment.y * blockSize) + 2, 2, 2);
+                            ctx.fillRect((segment.x * blockSize) + 2, (segment.y * blockSize) + blockSize - 4, 2, 2);
+                        } else if (direction === 'up') {
+                            ctx.fillRect((segment.x * blockSize) + 2, (segment.y * blockSize) + 2, 2, 2);
+                            ctx.fillRect((segment.x * blockSize) + blockSize - 4, (segment.y * blockSize) + 2, 2, 2);
+                        } else if (direction === 'down') {
+                            ctx.fillRect((segment.x * blockSize) + 2, (segment.y * blockSize) + blockSize - 4, 2, 2);
+                            ctx.fillRect((segment.x * blockSize) + blockSize - 4, (segment.y * blockSize) + blockSize - 4, 2, 2);
+                        }
+                    }
+                });
+                
+                // Desenhar comida
+                const foodInfo = foodTypes[food.type];
+                ctx.fillStyle = foodInfo.color;
+                ctx.beginPath();
+                ctx.arc(
+                    food.x * blockSize + blockSize / 2,
+                    food.y * blockSize + blockSize / 2,
+                    blockSize / 2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Desenhar comida bônus (piscando)
+                if (bonusActive && Math.floor(Date.now() / 150) % 2 === 0) {
+                    ctx.fillStyle = '#FFFF00';
+                    ctx.beginPath();
+                    ctx.arc(
+                        bonus.x * blockSize + blockSize / 2,
+                        bonus.y * blockSize + blockSize / 2,
+                        blockSize / 2 + 1,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            }
+            
+            function updateScore() {
+                scoreElement.textContent = score;
+            }
+            
+            function togglePause() {
+                isPaused = !isPaused;
+                document.getElementById('pause-btn').textContent = isPaused ? '▶' : 'II';
+            }
+            
+            function endGame() {
+                gameOver = true;
+                clearInterval(gameLoop);
+                finalScoreElement.textContent = score;
+                gameOverScreen.style.display = 'block';
+            }
+            
+            // Controles de teclado
+            document.addEventListener('keydown', (e) => {
+                switch (e.key) {
+                    case 'ArrowUp':
+                        if (direction !== 'down') nextDirection = 'up';
+                        e.preventDefault();
+                        break;
+                    case 'ArrowDown':
+                        if (direction !== 'up') nextDirection = 'down';
+                        e.preventDefault();
+                        break;
+                    case 'ArrowLeft':
+                        if (direction !== 'right') nextDirection = 'left';
+                        e.preventDefault();
+                        break;
+                    case 'ArrowRight':
+                        if (direction !== 'left') nextDirection = 'right';
+                        e.preventDefault();
+                        break;
+                    case ' ':
+                        togglePause();
+                        e.preventDefault();
+                        break;
+                }
+            });
+            
+            // Controles de botões
+            document.getElementById('up-btn').addEventListener('click', () => {
+                if (direction !== 'down') nextDirection = 'up';
+            });
+            
+            document.getElementById('down-btn').addEventListener('click', () => {
+                if (direction !== 'up') nextDirection = 'down';
+            });
+            
+            document.getElementById('left-btn').addEventListener('click', () => {
+                if (direction !== 'right') nextDirection = 'left';
+            });
+            
+            document.getElementById('right-btn').addEventListener('click', () => {
+                if (direction !== 'left') nextDirection = 'right';
+            });
+            
+            document.getElementById('pause-btn').addEventListener('click', togglePause);
+            
+            // Botão de reiniciar
+            restartBtn.addEventListener('click', initGame);
+            
+            // Controles de toque para dispositivos móveis
+            let touchStartX = 0;
+            let touchStartY = 0;
+            
+            document.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }, false);
+            
+            document.addEventListener('touchmove', (e) => {
+                if (!touchStartX || !touchStartY) return;
+                
+                const touchEndX = e.touches[0].clientX;
+                const touchEndY = e.touches[0].clientY;
+                
+                const diffX = touchStartX - touchEndX;
+                const diffY = touchStartY - touchEndY;
+                
+                // Deslizar na direção com maior diferença
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    // Deslizar horizontalmente
+                    if (diffX > 0) {
+                        // Deslizar para a esquerda
+                        if (direction !== 'right') nextDirection = 'left';
+                    } else {
+                        // Deslizar para a direita
+                        if (direction !== 'left') nextDirection = 'right';
+                    }
+                } else {
+                    // Deslizar verticalmente
+                    if (diffY > 0) {
+                        // Deslizar para cima
+                        if (direction !== 'down') nextDirection = 'up';
+                    } else {
+                        // Deslizar para baixo
+                        if (direction !== 'up') nextDirection = 'down';
+                    }
+                }
+                
+                touchStartX = 0;
+                touchStartY = 0;
+                e.preventDefault();
+            }, false);
+        });
+    </script>
+</body>
+</html>
